@@ -151,18 +151,17 @@ public let HeimdallrErrorNotAuthorized = 2
                     completion(.Failure(error))
                 }
             } else {
-                switch OAuthError.decode(data!) {
-                case let .Success(error):
-                    completion(.Failure(error.nsError))
-                default:
-                    let userInfo = [
-                        NSLocalizedDescriptionKey: NSLocalizedString("Could not authorize grant", comment: ""),
-                        NSLocalizedFailureReasonErrorKey: String(format: NSLocalizedString("Expected error, got: %@.", comment: ""), NSString(data: data!, encoding: NSUTF8StringEncoding) ?? "nil")
-                    ]
-
-                    let error = NSError(domain: HeimdallrErrorDomain, code: HeimdallrErrorInvalidData, userInfo: userInfo)
-                    completion(.Failure(error))
-                }
+				if let data = data, let error = OAuthError.decode(data) {
+					completion(.Failure(error.nsError))
+				} else {
+					let userInfo = [
+						NSLocalizedDescriptionKey: NSLocalizedString("Could not authorize grant", comment: ""),
+						NSLocalizedFailureReasonErrorKey: String(format: NSLocalizedString("Expected error, got: %@.", comment: ""), NSString(data: data!, encoding: NSUTF8StringEncoding) ?? "nil"),
+						]
+					
+					let error = NSError(domain: HeimdallrErrorDomain, code: HeimdallrErrorInvalidData, userInfo: userInfo)
+					completion(.Failure(error))
+				}
             }
         }
     }

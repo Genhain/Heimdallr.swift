@@ -1,5 +1,3 @@
-import Argo
-
 /// See: The OAuth 2.0 Authorization Framework, 5.2 Error Response
 ///      <https://tools.ietf.org/html/rfc6749#section-5.2>
 
@@ -42,21 +40,21 @@ public extension OAuthErrorCode {
     }
 }
 
-extension OAuthErrorCode: Decodable {
-    public static func decode(json: JSON) -> Decoded<OAuthErrorCode> {
-        return String.decode(json).flatMap { code in
-            return .fromOptional(OAuthErrorCode(rawValue: code))
-        }
-    }
+extension OAuthErrorCode {
+	public static func decode(json: AnyObject?) -> OAuthErrorCode? {
+		return json.flatMap { $0 as? String }.flatMap { code in
+			return OAuthErrorCode(rawValue: code)
+		}
+	}
 }
 
 public class OAuthError {
     public let code: OAuthErrorCode
     public let description: String?
     public let uri: String?
-	public let json: JSON?
+	public let json: [String: AnyObject]?
 
-	public init(code: OAuthErrorCode, description: String? = nil, uri: String? = nil, json: JSON? = nil) {
+	public init(code: OAuthErrorCode, description: String? = nil, uri: String? = nil, json: [String: AnyObject]? = nil) {
         self.code = code
         self.description = description
         self.uri = uri
@@ -77,34 +75,32 @@ public extension OAuthError {
         }
 		
 		if let json = json {
-			switch json {
-			case .Object(let JSON):
-				userInfo[OAuthJSONErrorKey] = JSON as? AnyObject
-			default:
-				break
-			}
-			
+			userInfo[OAuthJSONErrorKey] = json
 		}
 
         return NSError(domain: OAuthErrorDomain, code: code.intValue, userInfo: userInfo)
     }
 }
 
-extension OAuthError: Decodable {
-	public class func create(code: OAuthErrorCode)(description: String?)(uri: String?)(json: JSON?) -> OAuthError {
-        return OAuthError(code: code, description: description, uri: uri, json: json)
-    }
 
-    public class func decode(json: JSON) -> Decoded<OAuthError> {
-        return create
-            <^> json <| "error"
-            <*> json <|? "error_description"
-            <*> json <|? "error_uri"
-			<*> json <|? "json"
-    }
-
-    public class func decode(data: NSData) -> Decoded<OAuthError> {
-        let json: AnyObject? = try? NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions(rawValue: 0))
-        return Decoded<AnyObject>.fromOptional(json).flatMap(Argo.decode)
-    }
+extension OAuthError {
+	public class func decode(json: [String: AnyObject]) -> OAuthError? {
+		guard let code = json["error"].flatMap(OAuthErrorCode.decode) else {
+			return nil
+		}
+		
+		let description = json["error_description"] as? String
+		let uri = json["error_uri"] as? String
+		
+		return OAuthError(code: code, description: description, uri: uri, json: json)
+	}
+	
+	public class func decode(data: NSData) -> OAuthError? {
+		guard let json: AnyObject? = try? NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions(rawValue: 0)) as AnyObject?,
+			let jsonDictionary = json as? [String: AnyObject] else {
+				return nil
+		}
+		
+		return decode(jsonDictionary)
+	}
 }
