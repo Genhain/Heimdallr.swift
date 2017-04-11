@@ -12,6 +12,7 @@ public let OAuthErrorUnsupportedGrantType = 5
 public let OAuthErrorInvalidScope = 6
 
 public let OAuthURIErrorKey = "OAuthURIErrorKey"
+public let OAuthJSONErrorKey = "JSONErrorKey"
 
 public enum OAuthErrorCode: String {
     case InvalidRequest = "invalid_request"
@@ -53,11 +54,13 @@ public class OAuthError {
     public let code: OAuthErrorCode
     public let description: String?
     public let uri: String?
+	public let json: JSON?
 
-    public init(code: OAuthErrorCode, description: String? = nil, uri: String? = nil) {
+	public init(code: OAuthErrorCode, description: String? = nil, uri: String? = nil, json: JSON? = nil) {
         self.code = code
         self.description = description
         self.uri = uri
+		self.json = json
     }
 }
 
@@ -72,14 +75,24 @@ public extension OAuthError {
         if let uri = uri {
             userInfo[OAuthURIErrorKey] = uri
         }
+		
+		if let json = json {
+			switch json {
+			case .Object(let JSON):
+				userInfo[OAuthJSONErrorKey] = JSON as? AnyObject
+			default:
+				break
+			}
+			
+		}
 
         return NSError(domain: OAuthErrorDomain, code: code.intValue, userInfo: userInfo)
     }
 }
 
 extension OAuthError: Decodable {
-    public class func create(code: OAuthErrorCode)(description: String?)(uri: String?) -> OAuthError {
-        return OAuthError(code: code, description: description, uri: uri)
+	public class func create(code: OAuthErrorCode)(description: String?)(uri: String?)(json: JSON?) -> OAuthError {
+        return OAuthError(code: code, description: description, uri: uri, json: json)
     }
 
     public class func decode(json: JSON) -> Decoded<OAuthError> {
@@ -87,6 +100,7 @@ extension OAuthError: Decodable {
             <^> json <| "error"
             <*> json <|? "error_description"
             <*> json <|? "error_uri"
+			<*> json <|? "json"
     }
 
     public class func decode(data: NSData) -> Decoded<OAuthError> {
